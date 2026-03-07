@@ -1,14 +1,14 @@
 {
-  "name": "@learning-path-optimizer/api",
+  "name": "@learning-path-optimizer/server",
   "version": "1.0.0",
   "description": "Learning Path Optimizer - Backend API",
-  "main": "src/server.js",
+  "main": "server.js",
   "scripts": {
-    "dev": "nodemon src/server.js",
-    "start": "node src/server.js",
+    "dev": "nodemon server.js",
+    "start": "node server.js",
     "build": "echo 'No build step needed'",
-    "lint": "eslint src/",
-    "lint:fix": "eslint src/ --fix",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "test": "echo 'Tests placeholder'"
   },
   "dependencies": {

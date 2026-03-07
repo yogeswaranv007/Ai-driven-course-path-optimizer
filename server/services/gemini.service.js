@@ -93,15 +93,20 @@ async function generateWeeklyLearningPlan({
       isAiGenerated: true,
     };
   } catch (error) {
-    console.error('❌ Gemini API error:', error.message);
-    // Log the full error for debugging
-    if (error.response?.status) {
-      console.error(`   Status: ${error.response.status}`);
+    // Only log detailed errors in development mode
+    if (process.env.NODE_ENV === 'development') {
+      console.error('❌ Gemini API error:', error.message);
+      // Log the full error for debugging
+      if (error.response?.status) {
+        console.error(`   Status: ${error.response.status}`);
+      }
+      if (error.status) {
+        console.error(`   API Status: ${error.status}`);
+      }
     }
-    if (error.status) {
-      console.error(`   API Status: ${error.status}`);
+    if (process.env.LOG_LEVEL === 'verbose') {
+      console.warn('⚠️ Falling back to role-specific structured plan without AI enrichment.');
     }
-    console.warn('⚠️ Falling back to role-specific structured plan without AI enrichment.');
     // Return fallback - do NOT rethrow to allow roadmap creation
     return {
       plan: generateRoleSpecificFallbackPlan(jobRole, weeklyTopics, weeksRequired),

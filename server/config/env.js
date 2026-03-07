@@ -3,7 +3,10 @@ require('dotenv').config();
 const config = {
   node_env: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT, 10) || 5000,
-  mongodb_uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/learning-path-optimizer',
+  mongodb_uri:
+    process.env.MONGO_URI ||
+    process.env.MONGODB_URI ||
+    'mongodb://localhost:27017/learning-path-optimizer',
   jwt_secret: process.env.JWT_SECRET || 'dev-secret-change-in-production',
   jwt_expires_in: process.env.JWT_EXPIRES_IN || '7d',
   client_url: process.env.CLIENT_URL || 'http://localhost:5173',

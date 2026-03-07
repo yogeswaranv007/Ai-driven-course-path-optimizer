@@ -123,6 +123,14 @@ const roadmapRepository = {
         'roleName trackChosen createdAt status completionPercentage estimatedCompletionDays lastAccessedAt',
     });
   },
+
+  /**
+   * Find the most recent roadmap template by role.
+   * Used by demo mode to clone DB-backed dummy data.
+   */
+  async findLatestByRoleName(roleName) {
+    return RoadmapInstance.findOne({ roleName }).sort({ updatedAt: -1, createdAt: -1 });
+  },
 };
 
 module.exports = { roadmapRepository };

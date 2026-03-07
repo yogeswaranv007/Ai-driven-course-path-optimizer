@@ -4,6 +4,8 @@ const { generateRoadmap } = require('./roadmap.service.js');
 const { generateWeeklyLearningPlan } = require('./gemini.service.js');
 const { computeDailyHoursMode } = require('./planningModes.service.js');
 
+const isDemoModeEnabled = String(process.env.DEMO_MODE || '').toLowerCase() === 'true';
+
 const roadmapGenerationService = {
   /**
    * Generate a new roadmap instance for a user
@@ -28,6 +30,11 @@ const roadmapGenerationService = {
     }
     if (!skillSource || !['profile', 'custom'].includes(skillSource)) {
       throw new Error('Skill source must be "profile" or "custom"');
+    }
+
+    // Demo mode: clone pre-seeded role plans from DB to avoid live AI/runtime issues during review.
+    if (isDemoModeEnabled) {
+      return this._generateRoadmapFromDemoData(userId, options);
     }
 
     // Step 1: Get skills based on source
@@ -111,7 +118,9 @@ const roadmapGenerationService = {
 
     let enrichedWeeks = weeks;
     try {
-      console.log(`📚 Generating AI content for ${roleName} roadmap (${weeksRequired} weeks)...`);
+      if (process.env.LOG_LEVEL === 'verbose') {
+        console.log(`📚 Generating AI content for ${roleName} roadmap (${weeksRequired} weeks)...`);
+      }
       const aiResult = await generateWeeklyLearningPlan({
         jobRole: roleName,
         track: roadmap.selectedTrackName,
@@ -121,7 +130,7 @@ const roadmapGenerationService = {
       });
 
       // Check if AI actually generated content or fallback was used
-      if (aiResult.isAiGenerated) {
+      if (aiResult.isAiGenerated && process.env.LOG_LEVEL === 'verbose') {
         console.log('✨ AI content generated successfully');
       }
 
@@ -170,6 +179,119 @@ const roadmapGenerationService = {
     console.log(`✅ Roadmap created: ${roadmapInstance._id}`);
 
     return roadmapInstance;
+  },
+
+  /**
+   * Clone a DB-seeded roadmap template for the selected role.
+   */
+  async _generateRoadmapFromDemoData(userId, options) {
+    const { roleName, dailyLearningMinutes, skillSource, skills } = options;
+
+    const normalizedRoleName = this._normalizeRoleName(roleName);
+    let template = await roadmapRepository.findLatestByRoleName(normalizedRoleName);
+
+    if (!template) {
+      template = await roadmapRepository.findLatestByRoleName('Full Stack Developer');
+    }
+
+    const weeks = this._cloneTemplateWeeks(template?.weeks || [], dailyLearningMinutes);
+    const estimatedTotalHours = template?.estimatedTotalHours || 120;
+    const estimatedCompletionDays = Math.max(
+      1,
+      Math.ceil((estimatedTotalHours * 60) / dailyLearningMinutes)
+    );
+    const skillsUsed = this._buildDemoSkills(skillSource, skills, template?.skillsUsed || []);
+
+    const roadmapData = {
+      userId,
+      roleName: normalizedRoleName,
+      trackChosen: template?.trackChosen || this._getDefaultTrackId(normalizedRoleName),
+      dailyLearningMinutes,
+      estimatedTotalHours,
+      estimatedCompletionDays,
+      skillSource,
+      skillsUsed,
+      weeks,
+      status: 'active',
+      completionPercentage: 0,
+      lastAccessedAt: new Date(),
+      roadmapMetadata: {
+        ...(template?.roadmapMetadata || {}),
+        generatedInDemoMode: true,
+        source: 'db-dummy-template',
+      },
+    };
+
+    const roadmapInstance = await roadmapRepository.create(roadmapData);
+    console.log(`✅ Demo roadmap created from DB template: ${roadmapInstance._id}`);
+    return roadmapInstance;
+  },
+
+  _cloneTemplateWeeks(templateWeeks, dailyLearningMinutes) {
+    const now = new Date();
+
+    return (templateWeeks || []).map((week, weekIdx) => ({
+      weekNumber: week.weekNumber || weekIdx + 1,
+      topic: week.topic || `Week ${weekIdx + 1}`,
+      totalMinutes: week.totalMinutes || dailyLearningMinutes * 5,
+      aiContent: week.aiContent || null,
+      tasks: (week.tasks || []).map((task, taskIdx) => ({
+        taskId: task.taskId || `demo_task_${weekIdx + 1}_${taskIdx + 1}`,
+        title: task.title || `Task ${taskIdx + 1}`,
+        description: task.description || 'Complete this learning task.',
+        skill: task.skill || week.topic || 'General',
+        estimatedMinutes: task.estimatedMinutes || 60,
+        dayNumber: task.dayNumber || weekIdx * 7 + taskIdx + 1,
+        weekNumber: week.weekNumber || weekIdx + 1,
+        status: 'pending',
+        completedAt: null,
+        reason: task.reason || 'Important for your target role.',
+        resources: task.resources || [],
+        exercise: task.exercise || null,
+      })),
+    }));
+  },
+
+  _buildDemoSkills(skillSource, skills, templateSkills) {
+    if (skillSource === 'custom' && Array.isArray(skills) && skills.length > 0) {
+      return skills.map((s) => ({
+        name: s.name,
+        level: s.level,
+      }));
+    }
+
+    if (Array.isArray(templateSkills) && templateSkills.length > 0) {
+      return templateSkills.map((s) => ({
+        name: s.name,
+        level: s.level,
+      }));
+    }
+
+    return [{ name: 'JavaScript', level: 'beginner' }];
+  },
+
+  _normalizeRoleName(roleName) {
+    const roleMapping = {
+      'Frontend Developer': 'Frontend Developer',
+      'Backend Developer': 'Backend Developer',
+      'Full Stack Developer': 'Full Stack Developer',
+      'React Developer': 'React Developer',
+      'Node.js Developer': 'Node.js Developer',
+    };
+
+    return roleMapping[roleName] || 'Full Stack Developer';
+  },
+
+  _getDefaultTrackId(roleName) {
+    const trackByRole = {
+      'Frontend Developer': 'react-frontend',
+      'Backend Developer': 'node-backend',
+      'Full Stack Developer': 'mern-full-stack',
+      'React Developer': 'react-specialist',
+      'Node.js Developer': 'node-specialist',
+    };
+
+    return trackByRole[roleName] || 'mern-full-stack';
   },
 
   /**

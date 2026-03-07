@@ -1,0 +1,28 @@
+const TOPICS = [
+  'JS Basics',
+  'DOM Manipulation',
+  'Async JS',
+  'React Basics',
+  'React Hooks',
+  'State Management',
+  'Node.js Basics',
+  'Express.js',
+  'REST APIs',
+  'Database Design',
+  'MongoDB',
+  'Authentication',
+  'Arrays & Strings',
+  'Linked Lists',
+  'Stacks & Queues',
+  'Trees',
+  'Graphs',
+  'Dynamic Programming',
+  'Python Basics',
+  'NumPy & Pandas',
+  'Data Visualization',
+  'ML Fundamentals',
+  'Supervised Learning',
+  'Deep Learning',
+];
+
+module.exports = { TOPICS };

@@ -4,7 +4,7 @@
   "description": "Learning Path Optimizer - Backend API",
   "main": "server.js",
   "scripts": {
-    "dev": "nodemon server.js",
+    "dev": "kill-port 5000 && nodemon server.js",
     "start": "node server.js",
     "build": "echo 'No build step needed'",
     "lint": "eslint .",
@@ -12,7 +12,7 @@
     "test": "echo 'Tests placeholder'"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.3.0",
+    "groq-sdk": "^0.15.0",
     "@learning-path-optimizer/shared": "*",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.6",
@@ -29,6 +29,7 @@
   },
   "devDependencies": {
     "eslint": "^8.55.0",
+    "kill-port": "^2.0.1",
     "nodemon": "^3.0.2"
   }
 }

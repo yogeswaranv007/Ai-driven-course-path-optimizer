@@ -213,7 +213,7 @@ apps/api/src/
 ├── services/
 │   ├── ai.service.js
 │   ├── auth.service.js
-│   ├── gemini.service.js          ← UPDATED
+│   ├── groq.service.js          ← UPDATED
 │   ├── profile.service.js         ← NEW
 │   ├── roadmap.service.js         ← REFACTORED (was plan.service.js)
 │   ├── roadmapGenerator.service.js
@@ -476,17 +476,17 @@ class RoadmapService {
 
 ---
 
-### 4.3 GeminiService (Updated)
+### 4.3 GroqService (Updated)
 
 ```javascript
-class GeminiService {
+class GroqService {
   async generateRoadmapTasks(options)
   async generateTaskDetails(options)
   async generateResourceRecommendations(skill)
 }
 ```
 
-**Key Change**: Gemini now generates structured tasks with:
+**Key Change**: Groq now generates structured tasks with:
 
 - Clear descriptions
 - Learning objectives
@@ -520,7 +520,7 @@ POST /api/roadmaps/generate
    - Days required (totalHours / (dailyMinutes/60))
    - Weeks required (days / 7)
 5. Generate week structure (deterministic)
-6. Call Gemini AI to generate:
+6. Call Groq AI to generate:
    - Task titles
    - Task descriptions
    - Learning objectives
@@ -532,9 +532,9 @@ POST /api/roadmaps/generate
 9. Return roadmap ID
 ```
 
-### Step 3: What Gemini Generates
+### Step 3: What Groq Generates
 
-**Input to Gemini**:
+**Input to Groq**:
 
 ```javascript
 {
@@ -548,7 +548,7 @@ POST /api/roadmaps/generate
 }
 ```
 
-**Output from Gemini**:
+**Output from Groq**:
 
 ```javascript
 {
@@ -846,7 +846,7 @@ POST /api/roadmaps/generate
 2. Create RoadmapInstance model
 3. Create profile controller/service/routes
 4. Refactor plan → roadmap controller/service
-5. Update Gemini service for task generation
+5. Update Groq service for task generation
 6. Test all APIs with Postman
 
 ### Phase 2: Frontend (Week 2)
@@ -886,7 +886,7 @@ POST /api/roadmaps/generate
 - **Clarity**: Know which skills were used for each roadmap
 - **Audit**: Track whether profile or custom skills were used
 
-### 9.4 Gemini's Role
+### 9.4 Groq's Role
 
 - **Content Only**: Generate descriptions, explanations, resources
 - **Not Math**: Backend calculates hours, days, weeks

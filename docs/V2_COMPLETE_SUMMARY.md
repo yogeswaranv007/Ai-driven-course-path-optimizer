@@ -538,7 +538,7 @@ Request → Route → Controller → Service → Repository → Database
 - **Audit**: Track profile vs custom skill usage
 - **Freedom**: Try different roles without changing profile
 
-### 4. Gemini's Role (Unchanged from V1)
+### 4. Groq's Role (Unchanged from V1)
 
 - **Content Generation**: Task descriptions, resources, exercises
 - **NOT Calculations**: Timeline, hours, days (deterministic backend logic)
@@ -578,7 +578,7 @@ Request → Route → Controller → Service → Repository → Database
 1. ✅ Backend is running
 2. ✅ API endpoints ready
 3. ⏳ Test all endpoints with Postman/Thunder Client
-4. ⏳ Verify Gemini AI integration works
+4. ⏳ Verify Groq AI integration works
 5. ⏳ Test error scenarios
 
 ### Phase 2 (Frontend)

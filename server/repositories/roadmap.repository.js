@@ -120,7 +120,7 @@ const roadmapRepository = {
   async getRoadmapSummaries(userId) {
     return this.findByUserId(userId, {
       fields:
-        'roleName trackChosen createdAt status completionPercentage estimatedCompletionDays lastAccessedAt',
+        'roadmapName roleName trackChosen createdAt status completionPercentage estimatedCompletionDays estimatedTotalHours lastAccessedAt dailyLearningMinutes skillSource phases totalPhases totalDays weeks',
     });
   },
 

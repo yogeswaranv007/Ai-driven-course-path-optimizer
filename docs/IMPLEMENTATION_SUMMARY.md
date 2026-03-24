@@ -63,7 +63,7 @@ skills: [
           exercise: {description, expectedOutcome}
         }
       ],
-      aiContent: {                     // Gemini-generated content
+      aiContent: {                     // Groq-generated content
         why: String,
         keyTakeaways: [String],
         summary: String
@@ -133,7 +133,7 @@ generateRoadmapInstance(userId, {
 3. Generate roadmap structure (existing logic)
 4. Calculate timeline (deterministic)
 5. Transform to weekly tasks
-6. Enrich with Gemini AI content
+6. Enrich with Groq AI content
 7. Save as RoadmapInstance
 
 ---
@@ -186,7 +186,7 @@ router.use('/plans', planRoutes); // DEPRECATED
 
 ---
 
-#### 6. Gemini AI Integration
+#### 6. Groq AI Integration
 
 **Status**: Already implemented (from previous session)
 
@@ -631,7 +631,7 @@ apps/api/src/routes/index.js (added new routes)
 ✅ Skills stored persistently in profile  
 ✅ Two skill source options (profile vs custom)  
 ✅ RoadmapInstance model with complete task structure  
-✅ Gemini generates AI content, not calculations  
+✅ Groq generates AI content, not calculations  
 ✅ RESTful API design  
 ✅ Proper service/controller/model layers  
 ✅ MongoDB schema optimized

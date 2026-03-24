@@ -88,7 +88,7 @@ const learningPlanSchema = new mongoose.Schema(
     },
     planVersion: {
       type: Number,
-      default: 4, // Version with job-role-based planning and Gemini integration
+      default: 4, // Version with job-role-based planning and Groq integration
     },
     skillGaps: [
       {

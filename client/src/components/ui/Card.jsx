@@ -2,7 +2,7 @@
 const Card = ({ children, className = '', ...props }) => {
   return (
     <div
-      className={`bg-white rounded-2xl shadow-sm border border-gray-200 p-6 ${className}`}
+      className={`bg-white/90 backdrop-blur-xl rounded-2xl shadow-sm border border-indigo-50/50 p-6 transition-smooth hover:shadow-glow hover:-translate-y-1 ${className}`}
       {...props}
     >
       {children}

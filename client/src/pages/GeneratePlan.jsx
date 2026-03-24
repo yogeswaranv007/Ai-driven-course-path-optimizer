@@ -40,6 +40,8 @@ const SKILL_LEVELS = [
   { label: 'Advanced', value: 'advanced' },
 ];
 
+const VALID_SKILL_LEVELS = new Set(SKILL_LEVELS.map((item) => item.value));
+
 const GeneratePlan = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -52,6 +54,7 @@ const GeneratePlan = () => {
 
   // Job Role & Daily Minutes State
   const [roleName, setRoleName] = useState('');
+  const [roadmapName, setRoadmapName] = useState('');
   const [dailyMinutes, setDailyMinutes] = useState(120);
 
   const [error, setError] = useState('');
@@ -102,9 +105,21 @@ const GeneratePlan = () => {
           setError('Please enter a name for all skills');
           return false;
         }
+        if (
+          customSkills.some((s) => !VALID_SKILL_LEVELS.has(String(s.level || '').toLowerCase()))
+        ) {
+          setError(
+            'Please choose a valid level (Beginner, Intermediate, or Advanced) for all custom skills'
+          );
+          return false;
+        }
       }
     }
     if (step === 2) {
+      if (roadmapName.trim().length > 100) {
+        setError('Roadmap name must be 100 characters or less');
+        return false;
+      }
       if (!roleName || roleName.trim().length === 0) {
         setError('Please select a target job role');
         return false;
@@ -136,7 +151,20 @@ const GeneratePlan = () => {
     setError('');
 
     try {
+      const normalizedCustomSkills =
+        skillSource === 'custom'
+          ? customSkills
+              .map((s) => ({
+                name: String(s.name || '').trim(),
+                level: VALID_SKILL_LEVELS.has(String(s.level || '').toLowerCase())
+                  ? String(s.level).toLowerCase()
+                  : 'beginner',
+              }))
+              .filter((s) => s.name.length > 0)
+          : [];
+
       const payload = {
+        roadmapName: roadmapName.trim() || undefined,
         roleName,
         dailyLearningMinutes: Number(dailyMinutes),
         skillSource,
@@ -144,25 +172,47 @@ const GeneratePlan = () => {
 
       // Add skills if using custom
       if (skillSource === 'custom') {
-        payload.skills = customSkills.map((s) => ({
-          name: s.name.trim(),
-          level: s.level,
-        }));
+        payload.skills = normalizedCustomSkills;
       }
 
       const response = await api.post('/roadmaps/generate', payload);
 
       // Navigate to roadmap detail view
       if (response.data.roadmap) {
-        navigate(`/roadmaps/${response.data.roadmap._id}`);
+        navigate(`/roadmaps/${response.data.roadmap._id}`, {
+          state: {
+            generationNotice: response.data.quotaFallbackUsed
+              ? response.data.quotaFallbackMessage ||
+                'Groq quota is exhausted, so a role-based default plan was generated.'
+              : null,
+          },
+        });
       }
     } catch (err) {
       console.error('Roadmap generation error:', err);
+      if (err.response?.data) {
+        console.error('Roadmap generation error response:', err.response.data);
+      }
 
       // Handle specific error types
       if (err.response?.data) {
         const errData = err.response.data;
-        setError(errData.message || errData.error || 'Failed to generate roadmap');
+        const normalizedDetails =
+          typeof errData.details === 'string'
+            ? errData.details
+            : Array.isArray(errData.details)
+              ? errData.details
+                  .map((item) =>
+                    typeof item === 'string' ? item : item?.message || JSON.stringify(item)
+                  )
+                  .join(' ')
+              : errData.details
+                ? JSON.stringify(errData.details)
+                : '';
+        const detailed = [errData.error, normalizedDetails, errData.suggestion]
+          .filter(Boolean)
+          .join(' ');
+        setError(detailed || errData.message || 'Failed to generate roadmap');
       } else {
         setError('Failed to generate roadmap. Please try again.');
       }
@@ -376,6 +426,22 @@ const GeneratePlan = () => {
               <div className="space-y-6">
                 <h2 className="text-2xl font-bold text-gray-900 mb-4">Configuration</h2>
 
+                {/* Roadmap Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Roadmap Name <span className="text-gray-500">(optional)</span>
+                  </label>
+                  <Input
+                    type="text"
+                    value={roadmapName}
+                    onChange={(e) => setRoadmapName(e.target.value)}
+                    placeholder="e.g., Frontend to Full-Stack Transition"
+                    maxLength={100}
+                    disabled={loading}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">{roadmapName.length}/100</p>
+                </div>
+
                 {/* Job Role Selection */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -469,6 +535,10 @@ const GeneratePlan = () => {
 
                   {/* Job Role & Minutes */}
                   <div className="border-t border-indigo-200 pt-3 space-y-2">
+                    <p className="text-sm text-gray-700">
+                      <span className="font-semibold">Roadmap Name:</span>{' '}
+                      {roadmapName.trim() || 'Auto-generated from role'}
+                    </p>
                     <p className="text-sm text-gray-700">
                       <span className="font-semibold">Target Role:</span> 🎯 {roleName}
                     </p>

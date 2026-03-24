@@ -152,7 +152,7 @@ Create `.env` file in `apps/api/`:
 PORT=5000
 MONGO_URI=mongodb+srv://...
 JWT_SECRET=your_secret_key
-GEMINI_API_KEY=your_gemini_api_key
+GROQ_API_KEY=YOUR_GROQ_API_KEY_HERE
 ```
 
 ---

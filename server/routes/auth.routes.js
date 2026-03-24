@@ -9,10 +9,21 @@ const { config } = require('../config/env.js');
 
 const router = express.Router();
 
+// Authentication
 router.post('/register', authRateLimiter, validateRequest(registerSchema), authController.register);
 router.post('/login', authRateLimiter, validateRequest(loginSchema), authController.login);
 router.post('/logout', authController.logout);
+router.post('/logout/all', authMiddleware, authController.logoutAll);
+
+// Token management
+router.post('/refresh', authController.refresh);
+
+// User info
 router.get('/me', authMiddleware, authController.me);
+
+// Session management
+router.get('/sessions', authMiddleware, authController.getSessions);
+router.delete('/sessions/:sessionId', authMiddleware, authController.revokeSession);
 
 // Google OAuth
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));

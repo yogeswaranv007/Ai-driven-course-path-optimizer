@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../services/api.js';
 import Button from '../components/ui/Button.jsx';
 import Card from '../components/ui/Card.jsx';
@@ -10,11 +10,28 @@ import LoadingSpinner from '../components/ui/LoadingSpinner.jsx';
 const RoadmapDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [roadmap, setRoadmap] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState(location.state?.generationNotice || '');
   const [expandedWeeks, setExpandedWeeks] = useState(new Set([1])); // First week expanded by default
+  const [expandedPhases, setExpandedPhases] = useState(new Set([1]));
   const [updatingTask, setUpdatingTask] = useState(null);
+  const [updatingPhase, setUpdatingPhase] = useState(null);
+  const [loadingDay, setLoadingDay] = useState(null);
+
+  const hasVisibleDayContent = (day) => {
+    if (!day?.content) return false;
+
+    const hasObjectives =
+      Array.isArray(day.content.learningObjectives) && day.content.learningObjectives.length > 0;
+    const hasWhyImportant = Boolean(String(day.content.whyImportant || '').trim());
+    const hasPracticeTask = Boolean(String(day.content.practiceTask?.title || '').trim());
+    const hasResources = Array.isArray(day.content.resources) && day.content.resources.length > 0;
+
+    return hasObjectives || hasWhyImportant || hasPracticeTask || hasResources;
+  };
 
   useEffect(() => {
     fetchRoadmap();
@@ -44,6 +61,56 @@ const RoadmapDetail = () => {
     });
   };
 
+  const togglePhase = (phaseNumber) => {
+    setExpandedPhases((prev) => {
+      const next = new Set(prev);
+      if (next.has(phaseNumber)) {
+        next.delete(phaseNumber);
+      } else {
+        next.add(phaseNumber);
+      }
+      return next;
+    });
+  };
+
+  const handleGenerateDayContent = async (dayNumber) => {
+    setLoadingDay(dayNumber);
+    setError('');
+
+    try {
+      const res = await api.get(`/roadmaps/${id}/days/${dayNumber}`);
+      const updatedDay = res.data.day;
+
+      setRoadmap((prev) => {
+        if (!prev?.phases) return prev;
+        const nextPhases = prev.phases.map((phase) => ({
+          ...phase,
+          days: (phase.days || []).map((day) =>
+            day.dayNumber === dayNumber
+              ? {
+                  ...day,
+                  contentStatus: updatedDay.contentStatus,
+                  content: updatedDay.content,
+                }
+              : day
+          ),
+        }));
+        return {
+          ...prev,
+          phases: nextPhases,
+        };
+      });
+    } catch (err) {
+      setError(
+        err.response?.data?.error ||
+          err.response?.data?.details ||
+          'Failed to generate day content. Please try again.'
+      );
+    } finally {
+      setLoadingDay(null);
+    }
+  };
+
   const handleTaskStatusUpdate = async (taskId, newStatus) => {
     setUpdatingTask(taskId);
     setError('');
@@ -58,6 +125,34 @@ const RoadmapDetail = () => {
       setError(error.response?.data?.message || 'Failed to update task status');
     } finally {
       setUpdatingTask(null);
+    }
+  };
+
+  const handlePhaseBulkStatusUpdate = async (phase, newStatus) => {
+    const targetDayNumbers = (phase.days || [])
+      .filter((day) => {
+        if (newStatus === 'completed') return day.status !== 'completed';
+        return day.status === 'completed';
+      })
+      .map((day) => day.dayNumber);
+
+    if (targetDayNumbers.length === 0) {
+      return;
+    }
+
+    setUpdatingPhase(`${phase.phaseNumber}-${newStatus}`);
+    setError('');
+
+    try {
+      for (const dayNumber of targetDayNumbers) {
+        await api.patch(`/roadmaps/${id}/tasks/day-${dayNumber}`, { status: newStatus });
+      }
+      await fetchRoadmap();
+    } catch (updateError) {
+      console.error('Failed to bulk update phase days:', updateError);
+      setError(updateError.response?.data?.message || 'Failed to update days in this phase');
+    } finally {
+      setUpdatingPhase(null);
     }
   };
 
@@ -87,6 +182,17 @@ const RoadmapDetail = () => {
         return 'text-gray-600 bg-gray-100';
       default:
         return 'text-gray-600 bg-gray-100';
+    }
+  };
+
+  const getDayStatusBadgeVariant = (status) => {
+    switch (status) {
+      case 'completed':
+        return 'success';
+      case 'in-progress':
+        return 'warning';
+      default:
+        return 'default';
     }
   };
 
@@ -176,6 +282,12 @@ const RoadmapDetail = () => {
         </div>
 
         {/* Error Message */}
+        {notice && (
+          <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800">
+            {notice}
+          </div>
+        )}
+
         {error && (
           <div className="mb-6">
             <ErrorBanner message={error} onClose={() => setError('')} />
@@ -222,8 +334,10 @@ const RoadmapDetail = () => {
             {/* Stats Grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-gray-200">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Total Weeks</p>
-                <p className="text-2xl font-bold text-gray-900">{roadmap.weeks?.length || 0}</p>
+                <p className="text-sm text-gray-600 mb-1">Total Phases</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {roadmap.totalPhases || roadmap.phases?.length || 0}
+                </p>
               </div>
               <div>
                 <p className="text-sm text-gray-600 mb-1">Daily Learning</p>
@@ -269,11 +383,237 @@ const RoadmapDetail = () => {
           </div>
         </Card>
 
-        {/* Weekly Learning Content */}
+        {/* Learning Content */}
         <div className="space-y-4">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Learning Path</h2>
 
-          {roadmap.weeks &&
+          {roadmap.phases && roadmap.phases.length > 0
+            ? roadmap.phases.map((phase) => (
+                <Card key={phase.phaseNumber} className="overflow-hidden">
+                  <button
+                    onClick={() => togglePhase(phase.phaseNumber)}
+                    className="w-full text-left flex items-center justify-between p-6 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-xl font-semibold text-gray-900">
+                          Phase {phase.phaseNumber}: {phase.phaseName}
+                        </h3>
+                        <Badge variant="default">{phase.days?.length || 0} days</Badge>
+                      </div>
+                      <p className="text-sm text-gray-700">{phase.goal}</p>
+                    </div>
+                    <svg
+                      className={`w-6 h-6 text-gray-400 transition-transform ${
+                        expandedPhases.has(phase.phaseNumber) ? 'transform rotate-180' : ''
+                      }`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  </button>
+
+                  {expandedPhases.has(phase.phaseNumber) && (
+                    <div className="px-6 pb-6 border-t border-gray-100 space-y-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3 pt-4">
+                        <p className="text-sm text-gray-600">
+                          {(phase.days || []).filter((d) => d.status === 'completed').length}/
+                          {phase.days?.length || 0} days completed in this phase
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="primary"
+                            disabled={updatingPhase === `${phase.phaseNumber}-completed`}
+                            onClick={() => handlePhaseBulkStatusUpdate(phase, 'completed')}
+                          >
+                            {updatingPhase === `${phase.phaseNumber}-completed`
+                              ? 'Marking...'
+                              : 'Complete All Days'}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={updatingPhase === `${phase.phaseNumber}-pending`}
+                            onClick={() => handlePhaseBulkStatusUpdate(phase, 'pending')}
+                          >
+                            {updatingPhase === `${phase.phaseNumber}-pending`
+                              ? 'Undoing...'
+                              : 'Undo All Days'}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {(phase.days || []).map((day) => (
+                        <div
+                          key={day.dayNumber}
+                          className="border rounded-lg p-4 bg-white border-gray-200"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-gray-900">
+                                Day {day.dayNumber}: {day.topic}
+                              </h4>
+                              <p className="text-sm text-gray-600 mt-1">
+                                {day.estimatedMinutes} minutes
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant={getDayStatusBadgeVariant(day.status)}>
+                                {day.status || 'pending'}
+                              </Badge>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant={day.status === 'completed' ? 'outline' : 'primary'}
+                                disabled={updatingTask === `day-${day.dayNumber}`}
+                                onClick={() =>
+                                  handleTaskStatusUpdate(
+                                    `day-${day.dayNumber}`,
+                                    day.status === 'completed' ? 'pending' : 'completed'
+                                  )
+                                }
+                              >
+                                {updatingTask === `day-${day.dayNumber}`
+                                  ? 'Updating...'
+                                  : day.status === 'completed'
+                                    ? 'Undo'
+                                    : 'Complete'}
+                              </Button>
+                            </div>
+                          </div>
+
+                          {hasVisibleDayContent(day) ? (
+                            <div className="mt-4 space-y-3">
+                              {day.content?.learningObjectives?.length > 0 && (
+                                <div>
+                                  <p className="text-sm font-medium text-gray-800 mb-1">Study</p>
+                                  <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
+                                    {day.content.learningObjectives.map((obj, idx) => (
+                                      <li key={idx}>{obj}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+
+                              {day.content?.whyImportant && (
+                                <div className="text-sm text-gray-700">
+                                  <span className="font-medium">Why this matters:</span>{' '}
+                                  {day.content.whyImportant}
+                                </div>
+                              )}
+
+                              {day.content?.resources?.length > 0 && (
+                                <div className="space-y-3">
+                                  {day.content.resources.filter(
+                                    (resource) => resource.type === 'documentation'
+                                  ).length > 0 && (
+                                    <div>
+                                      <p className="text-sm font-medium text-gray-800 mb-1">Docs</p>
+                                      <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
+                                        {day.content.resources
+                                          .filter((resource) => resource.type === 'documentation')
+                                          .map((resource, index) => (
+                                            <li key={`doc-${index}`}>
+                                              <a
+                                                href={resource.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-indigo-600 hover:text-indigo-800 underline"
+                                              >
+                                                {resource.title}
+                                              </a>
+                                            </li>
+                                          ))}
+                                      </ul>
+                                    </div>
+                                  )}
+
+                                  {day.content.resources.filter(
+                                    (resource) => resource.type === 'youtube'
+                                  ).length > 0 && (
+                                    <div>
+                                      <p className="text-sm font-medium text-gray-800 mb-1">
+                                        Videos
+                                      </p>
+                                      <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
+                                        {day.content.resources
+                                          .filter((resource) => resource.type === 'youtube')
+                                          .map((resource, index) => (
+                                            <li key={`video-${index}`}>
+                                              {resource.url ? (
+                                                <a
+                                                  href={resource.url}
+                                                  target="_blank"
+                                                  rel="noopener noreferrer"
+                                                  className="text-indigo-600 hover:text-indigo-800 underline"
+                                                >
+                                                  {resource.title}
+                                                  {resource.channelName
+                                                    ? ` — ${resource.channelName}`
+                                                    : ''}
+                                                </a>
+                                              ) : (
+                                                <span>
+                                                  {resource.title}
+                                                  {resource.channelName
+                                                    ? ` — ${resource.channelName}`
+                                                    : ''}
+                                                </span>
+                                              )}
+                                            </li>
+                                          ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {day.content.practiceTask?.title && (
+                                <div className="text-sm text-gray-700">
+                                  <span className="font-medium">Practice:</span>{' '}
+                                  {day.content.practiceTask.title}
+                                  {day.content.practiceTask.description
+                                    ? ` — ${day.content.practiceTask.description}`
+                                    : ''}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="mt-4 flex items-center gap-3">
+                              <span className="text-xs text-gray-500">
+                                Content: {day.contentStatus || 'not-generated'}
+                              </span>
+                              <Button
+                                type="button"
+                                onClick={() => handleGenerateDayContent(day.dayNumber)}
+                                disabled={loadingDay === day.dayNumber}
+                              >
+                                {loadingDay === day.dayNumber
+                                  ? 'Generating...'
+                                  : 'Generate Day Content'}
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              ))
+            : null}
+
+          {(!roadmap.phases || roadmap.phases.length === 0) &&
+            roadmap.weeks &&
             roadmap.weeks.map((week) => (
               <Card key={week.weekNumber} className="overflow-hidden">
                 {/* Week Header - Clickable */}

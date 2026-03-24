@@ -4,9 +4,13 @@ import Card from '../components/ui/Card.jsx';
 
 const Landing = () => {
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen flex flex-col bg-transparent relative overflow-hidden">
+      {/* Background Decorative Blobs */}
+      <div className="absolute top-0 left-1/2 -ml-[30rem] w-[60rem] h-[60rem] bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none -z-10" />
+      <div className="absolute top-40 right-0 w-[40rem] h-[40rem] bg-violet-400/10 rounded-full blur-[100px] pointer-events-none -z-10" />
+
       {/* Hero Section */}
-      <section className="flex-1 py-16 md:py-24 px-4 md:px-6">
+      <section className="flex-1 py-20 md:py-32 px-4 md:px-6 relative z-10">
         <div className="mx-auto max-w-6xl">
           <div className="text-center mb-16">
             <div className="mb-6 flex justify-center">
@@ -16,8 +20,8 @@ const Landing = () => {
                 </svg>
               </div>
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6 leading-tight">
-              Your Personalized Learning Path
+            <h1 className="text-5xl md:text-6xl font-extrabold font-display tracking-tight text-gray-900 mb-6 leading-tight">
+              Your <span className="text-gradient">Personalized</span> Learning Path
             </h1>
             <p className="text-lg md:text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
               Get a custom 4-week learning plan based on your skills, marks, and available time.
@@ -38,76 +42,82 @@ const Landing = () => {
           </div>
 
           {/* Feature Cards */}
-          <div className="grid md:grid-cols-3 gap-6 mt-20">
+          <div className="grid md:grid-cols-3 gap-8 mt-24">
             {/* Feature 1 */}
-            <Card>
-              <div className="mb-4 w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
-                <svg
-                  className="w-6 h-6 text-indigo-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13 10V3L4 14h7v7l9-11h-7z"
-                  />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Personalized Plans</h3>
-              <p className="text-sm text-gray-600">
-                AI-driven recommendations tailored to your current skill level, marks, and learning
-                goals.
-              </p>
-            </Card>
+            <div className="group animate-fade-in-up" style={{ animationDelay: '0ms' }}>
+              <Card className="h-full">
+                <div className="mb-4 w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
+                  <svg
+                    className="w-6 h-6 text-indigo-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 10V3L4 14h7v7l9-11h-7z"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Personalized Plans</h3>
+                <p className="text-sm text-gray-600">
+                  AI-driven recommendations tailored to your current skill level, marks, and
+                  learning goals.
+                </p>
+              </Card>
+            </div>
 
             {/* Feature 2 */}
-            <Card>
-              <div className="mb-4 w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
-                <svg
-                  className="w-6 h-6 text-emerald-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                  />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Visual Progress</h3>
-              <p className="text-sm text-gray-600">
-                Track your skill gaps with beautiful charts and watch your improvement over time.
-              </p>
-            </Card>
+            <div className="group animate-fade-in-up" style={{ animationDelay: '150ms' }}>
+              <Card className="h-full">
+                <div className="mb-4 w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
+                  <svg
+                    className="w-6 h-6 text-emerald-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Visual Progress</h3>
+                <p className="text-sm text-gray-600">
+                  Track your skill gaps with beautiful charts and watch your improvement over time.
+                </p>
+              </Card>
+            </div>
 
             {/* Feature 3 */}
-            <Card>
-              <div className="mb-4 w-12 h-12 bg-sky-100 rounded-xl flex items-center justify-center">
-                <svg
-                  className="w-6 h-6 text-sky-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Smart Tracking</h3>
-              <p className="text-sm text-gray-600">
-                Mark tasks complete, review your progress, and get gentle nudges to stay on track.
-              </p>
-            </Card>
+            <div className="group animate-fade-in-up" style={{ animationDelay: '300ms' }}>
+              <Card className="h-full">
+                <div className="mb-4 w-12 h-12 bg-sky-100 rounded-xl flex items-center justify-center">
+                  <svg
+                    className="w-6 h-6 text-sky-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Smart Tracking</h3>
+                <p className="text-sm text-gray-600">
+                  Mark tasks complete, review your progress, and get gentle nudges to stay on track.
+                </p>
+              </Card>
+            </div>
           </div>
         </div>
       </section>

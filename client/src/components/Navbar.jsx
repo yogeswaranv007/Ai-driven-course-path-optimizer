@@ -19,18 +19,18 @@ const Navbar = () => {
     : [];
 
   return (
-    <nav className="sticky top-0 z-50 bg-white border-b border-gray-200">
+    <nav className="sticky top-0 z-50 glass-panel border-b border-indigo-100/50">
       <div className="mx-auto max-w-6xl px-4 md:px-6">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link
             to="/"
-            className="flex items-center gap-2 text-xl font-semibold text-gray-900 hover:text-indigo-600 transition-colors"
+            className="flex items-center gap-2 text-xl font-bold font-display text-gray-900 hover:opacity-80 transition-opacity"
           >
             <svg className="w-6 h-6 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
               <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5.951-1.429 5.951 1.429a1 1 0 001.169-1.409l-7-14z" />
             </svg>
-            Learning Path
+            <span className="text-gradient">Learning Path</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -39,13 +39,14 @@ const Navbar = () => {
               <Link
                 key={link.path}
                 to={link.path}
-                className={`text-sm font-medium transition-colors ${
-                  isActive(link.path)
-                    ? 'text-indigo-600 border-b-2 border-indigo-600 pb-4'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
+                className={`relative text-sm font-medium transition-colors py-1 ${
+                  isActive(link.path) ? 'text-indigo-600' : 'text-gray-500 hover:text-indigo-600'
+                } group`}
               >
                 {link.label}
+                <span
+                  className={`absolute bottom-0 left-0 w-full h-0.5 bg-indigo-600 transform origin-left transition-transform duration-300 ${isActive(link.path) ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'}`}
+                ></span>
               </Link>
             ))}
           </div>

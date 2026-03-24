@@ -5,6 +5,7 @@ import Card from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import LoadingSpinner from '../components/ui/LoadingSpinner.jsx';
 import EmptyState from '../components/ui/EmptyState.jsx';
+import ErrorBanner from '../components/ui/ErrorBanner.jsx';
 import SkillGapChart from '../components/SkillGapChart.jsx';
 
 const MyPlan = () => {
@@ -14,6 +15,8 @@ const MyPlan = () => {
   const [activeWeek, setActiveWeek] = useState(1);
   const [activeDay, setActiveDay] = useState(null);
   const [expandedTask, setExpandedTask] = useState(null);
+  const [updatingTask, setUpdatingTask] = useState(null);
+  const [error, setError] = useState('');
 
   // All hooks MUST be before any early returns
   useEffect(() => {
@@ -25,6 +28,7 @@ const MyPlan = () => {
         setSkillGaps(latest?.skillGaps || []);
       } catch (error) {
         console.error('Failed to fetch plan:', error);
+        setError(error.response?.data?.error || 'Failed to load plan');
       } finally {
         setLoading(false);
       }
@@ -39,6 +43,63 @@ const MyPlan = () => {
       setActiveDay(plan.weeks[activeWeek - 1].days[0].dayNumber);
     }
   }, [plan, activeWeek]); // Remove activeDay from dependency to avoid loops
+
+  const handleTaskStatusUpdate = async (task, status) => {
+    const roadmapId = plan?.roadmapMetadata?.roadmapId;
+    if (!roadmapId) {
+      setError('This plan is not linked to a roadmap instance, so task sync is unavailable.');
+      return;
+    }
+
+    const taskId = task.taskKey || task.taskId;
+    if (!taskId) {
+      setError('Task identifier is missing. Unable to update status.');
+      return;
+    }
+
+    setUpdatingTask(taskId);
+    setError('');
+
+    try {
+      await api.patch(
+        `/roadmaps/${encodeURIComponent(roadmapId)}/tasks/${encodeURIComponent(taskId)}`,
+        {
+          status,
+        }
+      );
+
+      setPlan((prev) => {
+        if (!prev?.weeks) return prev;
+        return {
+          ...prev,
+          weeks: prev.weeks.map((week) => ({
+            ...week,
+            days: (week.days || []).map((day) => ({
+              ...day,
+              tasks: (day.tasks || []).map((item) => {
+                const isTarget = (item.taskKey || item.taskId) === taskId;
+                if (!isTarget) return item;
+                return {
+                  ...item,
+                  status,
+                  completedAt: status === 'completed' ? new Date().toISOString() : null,
+                };
+              }),
+            })),
+          })),
+        };
+      });
+    } catch (updateError) {
+      console.error('Failed to update task status:', updateError);
+      const message =
+        updateError.response?.data?.error ||
+        updateError.response?.data?.details ||
+        'Failed to update task status';
+      setError(message);
+    } finally {
+      setUpdatingTask(null);
+    }
+  };
 
   // Early returns AFTER all hooks
   if (loading) {
@@ -100,6 +161,12 @@ const MyPlan = () => {
             Track your progress and complete your personalized learning journey
           </p>
         </div>
+
+        {error && (
+          <div className="mb-6">
+            <ErrorBanner message={error} onClose={() => setError('')} />
+          </div>
+        )}
 
         {/* Skill Gap Chart */}
         {skillGaps.length > 0 && (
@@ -296,8 +363,20 @@ const MyPlan = () => {
                               </div>
 
                               {/* Mark Complete Button */}
-                              <Button variant="secondary" size="sm" disabled>
-                                Mark Complete (Coming soon)
+                              <Button
+                                variant={task.status === 'completed' ? 'secondary' : 'primary'}
+                                size="sm"
+                                disabled={
+                                  updatingTask === (task.taskKey || task.taskId) ||
+                                  task.status === 'completed'
+                                }
+                                onClick={() => handleTaskStatusUpdate(task, 'completed')}
+                              >
+                                {updatingTask === (task.taskKey || task.taskId)
+                                  ? 'Updating...'
+                                  : task.status === 'completed'
+                                    ? 'Completed'
+                                    : 'Mark Complete'}
                               </Button>
                             </div>
 

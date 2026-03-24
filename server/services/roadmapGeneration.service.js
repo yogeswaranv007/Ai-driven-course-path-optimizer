@@ -1,10 +1,10 @@
 const { roadmapRepository } = require('../repositories/roadmap.repository.js');
 const { userRepository } = require('../repositories/user.repository.js');
 const { generateRoadmap } = require('./roadmap.service.js');
-const { generateWeeklyLearningPlan } = require('./gemini.service.js');
+const { generateWeeklyLearningPlan } = require('./groq.service.js');
 const { computeDailyHoursMode } = require('./planningModes.service.js');
 
-const isDemoModeEnabled = String(process.env.DEMO_MODE || '').toLowerCase() === 'true';
+const isDemoModeEnabled = () => String(process.env.DEMO_MODE || '').toLowerCase() === 'true';
 
 const roadmapGenerationService = {
   /**
@@ -21,6 +21,10 @@ const roadmapGenerationService = {
   async generateRoadmapInstance(userId, options) {
     const { roleName, dailyLearningMinutes, skillSource, skills } = options;
 
+    console.log(
+      `[ROADMAP] Request received user=${userId} role="${roleName}" minutes=${dailyLearningMinutes} source=${skillSource} demoMode=${isDemoModeEnabled()}`
+    );
+
     // Validation
     if (!roleName) {
       throw new Error('Role name is required');
@@ -33,7 +37,7 @@ const roadmapGenerationService = {
     }
 
     // Demo mode: clone pre-seeded role plans from DB to avoid live AI/runtime issues during review.
-    if (isDemoModeEnabled) {
+    if (isDemoModeEnabled()) {
       return this._generateRoadmapFromDemoData(userId, options);
     }
 
@@ -110,7 +114,18 @@ const roadmapGenerationService = {
     // Step 4: Transform roadmap to weekly structure
     const weeks = this._transformToWeeks(roadmap, dailyLearningMinutes);
 
-    // Step 5: Enrich with Gemini AI content
+    if (!weeks.length) {
+      throw new Error(
+        `Roadmap generation produced an empty week plan for role=${roleName}, track=${roadmap.selectedTrackId}`
+      );
+    }
+
+    const totalGeneratedTasks = weeks.reduce((sum, week) => sum + (week.tasks?.length || 0), 0);
+    console.log(
+      `[ROADMAP] Structural plan generated nodes=${roadmap.nodes?.length || 0} weeks=${weeks.length} tasks=${totalGeneratedTasks}`
+    );
+
+    // Step 5: Enrich with Groq AI content
     const weeksRequired = Math.ceil(planningParams.computedDays / 7);
     const weeklyTopics = roadmap.nodes
       .filter((n) => n.nodeId !== 'buffer-node')
@@ -130,8 +145,10 @@ const roadmapGenerationService = {
       });
 
       // Check if AI actually generated content or fallback was used
-      if (aiResult.isAiGenerated && process.env.LOG_LEVEL === 'verbose') {
-        console.log('✨ AI content generated successfully');
+      if (aiResult.isAiGenerated) {
+        console.log('✨ [ROADMAP] AI content generated successfully');
+      } else {
+        console.log('ℹ️ [ROADMAP] AI fallback content used');
       }
 
       const aiPlan = aiResult.plan;
@@ -147,8 +164,8 @@ const roadmapGenerationService = {
             }
           : null,
       }));
-    } catch (geminiError) {
-      console.warn('⚠️ Gemini AI failed, using basic structure:', geminiError.message);
+    } catch (groqError) {
+      console.warn('⚠️ Groq AI failed, using basic structure:', groqError.message);
     }
 
     // Step 6: Create roadmap instance
@@ -176,7 +193,15 @@ const roadmapGenerationService = {
     };
 
     const roadmapInstance = await roadmapRepository.create(roadmapData);
-    console.log(`✅ Roadmap created: ${roadmapInstance._id}`);
+
+    const totalTasks = (roadmapInstance.weeks || []).reduce(
+      (sum, week) => sum + (week.tasks?.length || 0),
+      0
+    );
+
+    console.log(
+      `✅ [ROADMAP] Real roadmap created id=${roadmapInstance._id} weeks=${roadmapInstance.weeks?.length || 0} tasks=${totalTasks} track=${roadmapInstance.trackChosen}`
+    );
 
     return roadmapInstance;
   },
@@ -223,7 +248,7 @@ const roadmapGenerationService = {
     };
 
     const roadmapInstance = await roadmapRepository.create(roadmapData);
-    console.log(`✅ Demo roadmap created from DB template: ${roadmapInstance._id}`);
+    console.log(`⚠️ [ROADMAP] Demo roadmap created from DB template: ${roadmapInstance._id}`);
     return roadmapInstance;
   },
 
@@ -433,7 +458,7 @@ const roadmapGenerationService = {
           topic: weekTopic,
           totalMinutes: weekTotalMinutes,
           tasks: weekDays.flatMap((day) => day.tasks),
-          aiContent: null, // Will be filled by Gemini
+          aiContent: null, // Will be filled by Groq
         });
       }
     }
@@ -515,70 +540,107 @@ const roadmapGenerationService = {
       },
     ];
 
-    // Define templates for each track with core skill nodes
-    const templates = {
-      'mern-full-stack': {
-        nodes: [
-          { skillId: 'javascript', priority: 'mandatory' },
-          { skillId: 'html-css', priority: 'mandatory' },
-          { skillId: 'react', priority: 'mandatory' },
-          { skillId: 'node', priority: 'mandatory' },
-          { skillId: 'mongodb', priority: 'mandatory' },
-          { skillId: 'rest-api', priority: 'recommended' },
-          { skillId: 'express', priority: 'recommended' },
-        ],
-        milestones: [],
-      },
-      'react-frontend': {
-        nodes: [
-          { skillId: 'javascript', priority: 'mandatory' },
-          { skillId: 'html-css', priority: 'mandatory' },
-          { skillId: 'react', priority: 'mandatory' },
-          { skillId: 'state-management', priority: 'recommended' },
-          { skillId: 'responsive-design', priority: 'recommended' },
-          { skillId: 'rest-api', priority: 'optional' },
-        ],
-        milestones: [],
-      },
-      'node-backend': {
-        nodes: [
-          { skillId: 'javascript', priority: 'mandatory' },
-          { skillId: 'node', priority: 'mandatory' },
-          { skillId: 'express', priority: 'mandatory' },
-          { skillId: 'mongodb', priority: 'recommended' },
-          { skillId: 'rest-api', priority: 'mandatory' },
-          { skillId: 'database-design', priority: 'recommended' },
-        ],
-        milestones: [],
-      },
-      'react-specialist': {
-        nodes: [
-          { skillId: 'javascript', priority: 'mandatory' },
-          { skillId: 'react', priority: 'mandatory' },
-          { skillId: 'hooks', priority: 'mandatory' },
-          { skillId: 'state-management', priority: 'mandatory' },
-          { skillId: 'testing-react', priority: 'recommended' },
-          { skillId: 'performance-optimization', priority: 'recommended' },
-        ],
-        milestones: [],
-      },
-      'node-specialist': {
-        nodes: [
-          { skillId: 'javascript', priority: 'mandatory' },
-          { skillId: 'node', priority: 'mandatory' },
-          { skillId: 'express', priority: 'mandatory' },
-          { skillId: 'async-programming', priority: 'mandatory' },
-          { skillId: 'system-design', priority: 'recommended' },
-          { skillId: 'scalability', priority: 'recommended' },
-        ],
-        milestones: [],
-      },
+    const skillNames = {
+      javascript: 'JavaScript Fundamentals',
+      'html-css': 'HTML & CSS',
+      react: 'React Core',
+      node: 'Node.js Fundamentals',
+      mongodb: 'MongoDB Basics',
+      'rest-api': 'REST API Design',
+      express: 'Express.js',
+      'state-management': 'State Management',
+      'responsive-design': 'Responsive Design',
+      'database-design': 'Database Design',
+      hooks: 'React Hooks',
+      'testing-react': 'React Testing',
+      'performance-optimization': 'Performance Optimization',
+      'async-programming': 'Async Programming',
+      'system-design': 'System Design',
+      scalability: 'Scalability Basics',
     };
+
+    const buildTemplate = (trackId, skillIds) => ({
+      nodes: skillIds.map((skillId, idx) => ({
+        nodeId: `${trackId}-node-${idx + 1}`,
+        skillId,
+        skillName: skillNames[skillId] || skillId,
+        milestoneId: `${trackId}-milestone-1`,
+        estimatedHours: 8 + idx * 2,
+        priority: idx < 3 ? 'mandatory' : 'recommended',
+        prerequisites: idx === 0 ? [] : [`${trackId}-node-${idx}`],
+      })),
+      milestones: [
+        {
+          milestoneId: `${trackId}-milestone-1`,
+          name: 'Core Track Milestone',
+          description: 'Complete foundational skills for this track.',
+        },
+      ],
+    });
+
+    // Define templates for each track with fully structured nodes.
+    const templates = {
+      'mern-full-stack': buildTemplate('mern-full-stack', [
+        'javascript',
+        'html-css',
+        'react',
+        'node',
+        'express',
+        'mongodb',
+        'rest-api',
+      ]),
+      'react-frontend': buildTemplate('react-frontend', [
+        'javascript',
+        'html-css',
+        'responsive-design',
+        'react',
+        'state-management',
+        'rest-api',
+      ]),
+      'node-backend': buildTemplate('node-backend', [
+        'javascript',
+        'node',
+        'express',
+        'rest-api',
+        'database-design',
+        'mongodb',
+      ]),
+      'react-specialist': buildTemplate('react-specialist', [
+        'javascript',
+        'react',
+        'hooks',
+        'state-management',
+        'testing-react',
+        'performance-optimization',
+      ]),
+      'node-specialist': buildTemplate('node-specialist', [
+        'javascript',
+        'node',
+        'async-programming',
+        'express',
+        'system-design',
+        'scalability',
+      ]),
+    };
+
+    const skillsById = Object.keys(skillNames).reduce((acc, skillId) => {
+      acc[skillId] = {
+        id: skillId,
+        name: skillNames[skillId],
+        proficiencyLevels: {
+          none: 1.0,
+          basic: 0.75,
+          intermediate: 0.55,
+          advanced: 0.35,
+        },
+      };
+      return acc;
+    }, {});
 
     return {
       tracks,
       templates,
-      skillsById: {},
+      skillsById,
     };
   },
 };

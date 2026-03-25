@@ -5,7 +5,6 @@ const { User } = require('../models/User.model.js');
 const { RoadmapInstance } = require('../models/RoadmapInstance.model.js');
 const { GlobalTemplate } = require('../models/GlobalTemplate.model.js');
 const roadmapOptimizerService = require('../services/roadmapOptimizer.service.js');
-const { callGroqDirectlyOrFallback } = require('../utils/groqFallback.js'); // Assuming this exists or similar AI service
 
 const router = express.Router();
 

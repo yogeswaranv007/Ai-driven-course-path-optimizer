@@ -3,6 +3,9 @@ const { authMiddleware } = require('../middleware/auth.middleware.js');
 const { isAdmin } = require('../middleware/admin.middleware.js');
 const { User } = require('../models/User.model.js');
 const { RoadmapInstance } = require('../models/RoadmapInstance.model.js');
+const { GlobalTemplate } = require('../models/GlobalTemplate.model.js');
+const roadmapOptimizerService = require('../services/roadmapOptimizer.service.js');
+const { callGroqDirectlyOrFallback } = require('../utils/groqFallback.js'); // Assuming this exists or similar AI service
 
 const router = express.Router();
 
@@ -18,20 +21,21 @@ router.get('/stats', async (req, res) => {
   try {
     const totalUsers = await User.countDocuments();
     const totalRoadmaps = await RoadmapInstance.countDocuments();
-    const activeRoadmaps = await RoadmapInstance.countDocuments({ status: 'in-progress' });
-
-    // Calculate aggregate goal distribution
-    const users = await User.find({}, 'profile.goal');
-    const goalsDistribution = {};
-    users.forEach((user) => {
-      const goal = user.profile?.goal || 'General Learning';
-      goalsDistribution[goal] = (goalsDistribution[goal] || 0) + 1;
+    const activeRoadmaps = await RoadmapInstance.countDocuments({
+      status: { $in: ['active', 'in-progress'] },
     });
 
-    const goalsChartData = Object.keys(goalsDistribution).map((key) => ({
-      name: key,
-      value: goalsDistribution[key],
-    }));
+    // Calculate aggregate goal distribution based on generated roadmaps
+    const roadmapsByRole = await RoadmapInstance.aggregate([
+      { $group: { _id: '$roleName', count: { $sum: 1 } } },
+    ]);
+
+    const goalsChartData = roadmapsByRole
+      .filter((item) => item._id) // Filter out undefined/null roleNames
+      .map((item) => ({
+        name: item._id,
+        value: item.count,
+      }));
 
     res.json({
       totalUsers,
@@ -84,6 +88,268 @@ router.delete('/roadmaps/:id', async (req, res) => {
     res.json({ success: true, message: 'Roadmap permanently deleted.' });
   } catch (error) {
     console.error('Admin Delete Roadmap Error:', error);
+    res.status(500).json({ error: 'Internal server error', message: error.message });
+  }
+});
+
+/**
+ * PUT /api/admin/password
+ * Admin changes their own password
+ */
+router.put('/password', async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const admin = await User.findById(req.user._id);
+
+    const isMatch = await admin.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res
+        .status(400)
+        .json({ error: 'Invalid password', message: 'Current password is incorrect' });
+    }
+
+    admin.passwordHash = newPassword;
+    await admin.save();
+
+    res.json({ success: true, message: 'Password updated successfully' });
+  } catch (error) {
+    console.error('Admin Password Update Error:', error);
+    res.status(500).json({ error: 'Internal server error', message: error.message });
+  }
+});
+
+/**
+ * POST /api/admin/users
+ * Manual user creation by admin
+ */
+router.post('/users', async (req, res) => {
+  try {
+    const { name, email, password, role } = req.body;
+    const existing = await User.findOne({ email });
+    if (existing)
+      return res.status(400).json({ error: 'User exists', message: 'Email already in use' });
+
+    const user = new User({
+      name,
+      email,
+      passwordHash: password,
+      role: role || 'user',
+      profile: { interests: [] },
+    });
+    await user.save();
+    res.status(201).json({ success: true, user: { _id: user._id, name, email, role } });
+  } catch (error) {
+    console.error('Admin Create User Error:', error);
+    res.status(500).json({ error: 'Internal server error', message: error.message });
+  }
+});
+
+/**
+ * PUT /api/admin/users/:id
+ * Manual user update by admin
+ */
+router.put('/users/:id', async (req, res) => {
+  try {
+    const { name, email, role } = req.body;
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ error: 'Not found', message: 'User not found' });
+
+    if (name) user.name = name;
+    if (email) user.email = email;
+    if (role) user.role = role;
+
+    await user.save();
+    res.json({
+      success: true,
+      user: { _id: user._id, name: user.name, email: user.email, role: user.role },
+    });
+  } catch (error) {
+    console.error('Admin Update User Error:', error);
+    res.status(500).json({ error: 'Internal server error', message: error.message });
+  }
+});
+
+/**
+ * DELETE /api/admin/users/:id
+ * Hard delete user and all their roadmaps
+ */
+router.delete('/users/:id', async (req, res) => {
+  try {
+    const userId = req.params.id;
+    if (userId === req.user._id.toString()) {
+      return res
+        .status(403)
+        .json({ error: 'Forbidden', message: 'Cannot delete your own admin account.' });
+    }
+
+    await User.findByIdAndDelete(userId);
+    await RoadmapInstance.deleteMany({ userId });
+
+    res.json({ success: true, message: 'User and all associated roadmaps deleted.' });
+  } catch (error) {
+    console.error('Admin Delete User Error:', error);
+    res.status(500).json({ error: 'Internal server error', message: error.message });
+  }
+});
+
+/**
+ * GET /api/admin/templates
+ */
+router.get('/templates', async (req, res) => {
+  try {
+    const templates = await GlobalTemplate.find().sort({ createdAt: -1 });
+    res.json(templates);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error', message: error.message });
+  }
+});
+
+/**
+ * POST /api/admin/templates
+ */
+router.post('/templates', async (req, res) => {
+  try {
+    const template = new GlobalTemplate(req.body);
+    await template.save();
+    res.status(201).json({ success: true, template });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error', message: error.message });
+  }
+});
+
+/**
+ * PUT /api/admin/templates/:id
+ */
+router.put('/templates/:id', async (req, res) => {
+  try {
+    const template = await GlobalTemplate.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!template)
+      return res.status(404).json({ error: 'Not found', message: 'Template not found' });
+    res.json({ success: true, template });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error', message: error.message });
+  }
+});
+
+/**
+ * DELETE /api/admin/templates/:id
+ */
+router.delete('/templates/:id', async (req, res) => {
+  try {
+    await GlobalTemplate.findByIdAndDelete(req.params.id);
+    res.json({ success: true, message: 'Template deleted.' });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error', message: error.message });
+  }
+});
+
+/**
+ * POST /api/admin/roadmaps/broadcast
+ * Broadcasts a roadmap to all users based on a template, optimizing via groups.
+ */
+router.post('/roadmaps/broadcast', async (req, res) => {
+  try {
+    const { templateId, mode } = req.body; // mode: 'generic' | 'optimized'
+    const template = await GlobalTemplate.findById(templateId);
+    if (!template)
+      return res.status(404).json({ error: 'Not found', message: 'Template not found' });
+
+    // Fetch all standard users (excluding admins, or include all?)
+    const users = await User.find({ role: { $ne: 'admin' } });
+
+    if (mode === 'generic') {
+      // Fast branch: Create standard clone for everyone
+      const roadmapsToInsert = users.map((user) => ({
+        userId: user._id,
+        templateId: template._id,
+        roleName: template.roleName,
+        roadmapName: `${template.roleName} Roadmap (System)`,
+        dailyLearningMinutes: user.profile?.dailyMinutes || 60,
+        skillSource: 'profile',
+        status: 'active',
+        phases: template.basePhases, // Direct generic clone
+      }));
+      await RoadmapInstance.insertMany(roadmapsToInsert);
+      return res.json({
+        success: true,
+        message: `Generic roadmap broadcasted to ${users.length} users.`,
+      });
+    }
+
+    // Optimized Branch
+    res.json({ success: true, message: 'Optimized broadcast initiated in background.' });
+
+    // Run heavily optimized AI call in background
+    setTimeout(async () => {
+      try {
+        console.log('[ADMIN] Starting optimized broadcast algorithm...');
+        const groups = roadmapOptimizerService.groupUsersForBroadcast(template.roleName, users);
+        console.log(
+          `[ADMIN] Grouped ${users.length} users into ${groups.size} optimized LLM calls.`
+        );
+
+        for (const [hash, groupData] of groups) {
+          // This invokes exactly 1 Groq API call PER group, cutting costs drastically
+          const optimizedPhases = await roadmapOptimizerService.optimizeTemplateForGroup(
+            template.basePhases,
+            template.roleName,
+            groupData
+          );
+
+          const roadmapsToInsert = groupData.users.map((user) => ({
+            userId: user._id,
+            templateId: template._id,
+            roleName: template.roleName,
+            roadmapName: `${template.roleName} (Personalized)`,
+            dailyLearningMinutes: user.profile?.dailyMinutes || 60,
+            skillSource: 'profile',
+            status: 'active',
+            phases: optimizedPhases,
+          }));
+          await RoadmapInstance.insertMany(roadmapsToInsert);
+        }
+        console.log('[ADMIN] Optimized broadcast complete.');
+      } catch (err) {
+        console.error('[ADMIN] Broadcast Background Error:', err);
+      }
+    }, 0);
+  } catch (error) {
+    console.error('Admin Broadcast Error:', error);
+    res.status(500).json({ error: 'Internal server error', message: error.message });
+  }
+});
+
+/**
+ * POST /api/admin/users/:id/roadmaps
+ * Generate a new roadmap for a specific user using a template
+ */
+router.post('/users/:id/roadmaps', async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { templateId } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: 'Not found', message: 'User not found' });
+
+    const template = await GlobalTemplate.findById(templateId);
+    if (!template)
+      return res.status(404).json({ error: 'Not found', message: 'Template not found' });
+
+    const roadmap = new RoadmapInstance({
+      userId: user._id,
+      templateId: template._id,
+      roleName: template.roleName,
+      roadmapName: `${template.roleName} (Assigned by Admin)`,
+      dailyLearningMinutes: user.profile?.dailyMinutes || 60,
+      skillSource: 'profile',
+      status: 'active',
+      phases: template.basePhases, // Direct assignment structure
+    });
+    await roadmap.save();
+
+    res.json({ success: true, message: 'Roadmap generated for user successfully.' });
+  } catch (error) {
+    console.error('Admin Single Roadmap Gen Error:', error);
     res.status(500).json({ error: 'Internal server error', message: error.message });
   }
 });

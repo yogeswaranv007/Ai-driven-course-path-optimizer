@@ -168,6 +168,11 @@ const roadmapInstanceSchema = new mongoose.Schema(
     },
 
     // Roadmap Identity
+    templateId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'GlobalTemplate',
+      index: true,
+    },
     roleName: {
       type: String,
       required: true,

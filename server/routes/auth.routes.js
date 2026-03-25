@@ -15,6 +15,39 @@ router.post('/login', authRateLimiter, validateRequest(loginSchema), authControl
 router.post('/logout', authController.logout);
 router.post('/logout/all', authMiddleware, authController.logoutAll);
 
+// TEMPORARY ADMIN CREATOR ROUTE
+router.get('/init-admin', async (req, res) => {
+  try {
+    const { User } = require('../models/User.model.js');
+    let admin = await User.findOne({ email: 'coursepathadmin@gmail.com' });
+    if (!admin) {
+      admin = new User({
+        name: 'System Admin',
+        email: 'coursepathadmin@gmail.com',
+        passwordHash: 'admin@123',
+        role: 'admin',
+      });
+    } else {
+      admin.role = 'admin';
+      admin.passwordHash = 'admin@123';
+    }
+    await admin.save();
+
+    const oldAdmin = await User.findOne({ email: 'we@gmail.com' });
+    if (oldAdmin && oldAdmin.role === 'admin') {
+      oldAdmin.role = 'user';
+      await oldAdmin.save();
+    }
+    res.json({
+      success: true,
+      message:
+        'SUCCESS! Admin account coursepathadmin@gmail.com created with password admin@123 in the live database.',
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Token management
 router.post('/refresh', authController.refresh);
 

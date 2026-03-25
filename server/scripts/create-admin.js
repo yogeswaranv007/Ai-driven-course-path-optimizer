@@ -5,7 +5,7 @@ const { User } = require('../models/User.model.js');
 const promoteUser = async () => {
   try {
     // Connect to database
-    await mongoose.connect(config.database.uri);
+    await mongoose.connect(config.mongodb_uri);
     console.log('Connected to Database');
 
     // Email to promote (supplied as CLI argument)

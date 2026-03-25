@@ -9,7 +9,9 @@ import RoadmapDetail from './pages/RoadmapDetail.jsx';
 import MyPlan from './pages/MyPlan.jsx';
 import PlanHistory from './pages/PlanHistory.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
+import AdminRoute from './components/AdminRoute.jsx';
 import Navbar from './components/Navbar.jsx';
+import AdminDashboard from './pages/admin/AdminDashboard.jsx';
 
 const App = () => {
   return (
@@ -71,6 +73,16 @@ const App = () => {
             <ProtectedRoute>
               <PlanHistory />
             </ProtectedRoute>
+          }
+        />
+
+        {/* Admin Routes */}
+        <Route
+          path="/admin/dashboard"
+          element={
+            <AdminRoute>
+              <AdminDashboard />
+            </AdminRoute>
           }
         />
 

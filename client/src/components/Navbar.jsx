@@ -12,6 +12,7 @@ const Navbar = () => {
 
   const navLinks = user
     ? [
+        ...(user.role === 'admin' ? [{ path: '/admin/dashboard', label: 'Admin Panel' }] : []),
         { path: '/dashboard', label: 'Dashboard' },
         { path: '/generate-plan', label: 'Generate Plan' },
         { path: '/profile', label: 'Profile' },

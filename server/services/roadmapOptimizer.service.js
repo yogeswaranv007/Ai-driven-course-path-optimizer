@@ -145,6 +145,7 @@ INSTRUCTIONS:
     try {
       const Groq = require('groq-sdk');
       const groq = new Groq({ apiKey: config.groq_api_key });
+      const { extractJsonObject } = require('./groq.service.js');
 
       const prompt = `You are an expert technical curriculum architect.
 Your task is to build a master roadmap template for a ${roleName}.
@@ -183,14 +184,20 @@ INSTRUCTIONS:
 
       let responseText = completion.choices[0]?.message?.content || '';
 
+      // Clean extraction via unified approach
+      const extractedStr = extractJsonObject(responseText);
+      if (extractedStr) {
+        const parsed = JSON.parse(extractedStr);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+
+      // Secondary array fast-fallback
       const startIdx = responseText.indexOf('[');
       const endIdx = responseText.lastIndexOf(']');
       if (startIdx !== -1 && endIdx !== -1) {
         responseText = responseText.substring(startIdx, endIdx + 1);
         const parsed = JSON.parse(responseText);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
       return [];
     } catch (err) {

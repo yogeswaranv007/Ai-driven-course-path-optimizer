@@ -32,6 +32,10 @@ export const adminService = {
   },
 
   // Roadmaps
+  getUserRoadmaps: async (userId) => {
+    const response = await api.get(`/admin/users/${userId}/roadmaps`);
+    return response.data;
+  },
   deleteRoadmap: async (id) => {
     const response = await api.delete(`/admin/roadmaps/${id}`);
     return response.data;

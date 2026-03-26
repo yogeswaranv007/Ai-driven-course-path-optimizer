@@ -169,6 +169,20 @@ router.put('/users/:id', async (req, res) => {
 });
 
 /**
+ * GET /api/admin/users/:id/roadmaps
+ * Fetch all roadmaps belonging to a specific user
+ */
+router.get('/users/:id/roadmaps', async (req, res) => {
+  try {
+    const roadmaps = await RoadmapInstance.find({ userId: req.params.id }).sort({ createdAt: -1 });
+    res.json(roadmaps);
+  } catch (error) {
+    console.error('Admin Get User Roadmaps Error:', error);
+    res.status(500).json({ error: 'Internal server error', message: error.message });
+  }
+});
+
+/**
  * DELETE /api/admin/users/:id
  * Hard delete user and all their roadmaps
  */

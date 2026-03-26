@@ -5,13 +5,20 @@ import { adminService } from '../../../services/admin.service.js';
 
 const UsersTab = ({ users, refresh }) => {
   const [loading, setLoading] = useState(false);
-  const [modal, setModal] = useState({ isOpen: false, type: '', data: null }); // type: 'add', 'edit', 'generate'
+  const [modal, setModal] = useState({ isOpen: false, type: '', data: null }); // type: 'add', 'edit', 'roadmaps'
   const [formData, setFormData] = useState({ name: '', email: '', role: 'user', password: '' });
+  const [userRoadmaps, setUserRoadmaps] = useState([]);
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
 
-  const openModal = (type, data = null) => {
+  const openModal = async (type, data = null) => {
     setModal({ isOpen: true, type, data });
     if (type === 'edit') {
       setFormData({ name: data.name, email: data.email, role: data.role, password: '' });
+    } else if (type === 'roadmaps') {
+      await fetchUserRoadmaps(data._id);
+      const temps = await adminService.getTemplates();
+      setTemplates(temps || []);
     } else {
       setFormData({ name: '', email: '', role: 'user', password: '' });
     }
@@ -56,6 +63,41 @@ const UsersTab = ({ users, refresh }) => {
       } finally {
         setLoading(false);
       }
+    }
+  };
+
+  const fetchUserRoadmaps = async (userId) => {
+    try {
+      const rm = await adminService.getUserRoadmaps(userId);
+      setUserRoadmaps(rm || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteRoadmap = async (roadmapId) => {
+    if (window.confirm('Delete this roadmap?')) {
+      try {
+        await adminService.deleteRoadmap(roadmapId);
+        await fetchUserRoadmaps(modal.data._id);
+        refresh(); // update count
+      } catch (err) {
+        alert('Failed to delete roadmap');
+      }
+    }
+  };
+
+  const handleGenerateRoadmap = async () => {
+    if (!selectedTemplateId) return alert('Select a template first');
+    try {
+      setLoading(true);
+      await adminService.generateForUser(modal.data._id, selectedTemplateId);
+      await fetchUserRoadmaps(modal.data._id);
+      refresh(); // update count
+    } catch (err) {
+      alert('Failed to generate roadmap');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -106,6 +148,14 @@ const UsersTab = ({ users, refresh }) => {
                     {user.roadmapCount || 0} Paths
                   </td>
                   <td className="p-4 px-6 text-right space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openModal('roadmaps', user)}
+                      className="shadow-none scale-90"
+                    >
+                      View Roadmaps
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -191,6 +241,78 @@ const UsersTab = ({ users, refresh }) => {
                 </Button>
               </div>
             </form>
+          </Card>
+        </div>
+      )}
+
+      {/* Roadmaps Management Modal */}
+      {modal.isOpen && modal.type === 'roadmaps' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-2xl p-6 bg-white animate-scale-up max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center mb-6 border-b pb-4">
+              <div>
+                <h3 className="text-xl font-bold">{modal.data?.name}'s assigned Roadmaps</h3>
+                <p className="text-sm text-gray-500">Manage learning paths for this user.</p>
+              </div>
+              <Button variant="ghost" className="text-gray-400" onClick={closeModal}>
+                ✕
+              </Button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto mb-6 pr-2">
+              {userRoadmaps.length === 0 ? (
+                <div className="text-center py-10 text-gray-400">No roadmaps generated yet.</div>
+              ) : (
+                <div className="space-y-3">
+                  {userRoadmaps.map((rm) => (
+                    <div
+                      key={rm._id}
+                      className="flex justify-between items-center p-4 border rounded-xl bg-gray-50"
+                    >
+                      <div>
+                        <h4 className="font-semibold text-gray-900">{rm.roadmapName}</h4>
+                        <p className="text-xs text-gray-500">
+                          Created: {new Date(rm.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className="text-sm font-medium text-indigo-600">
+                          {rm.completionPercentage}%
+                        </span>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteRoadmap(rm._id)}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="pt-4 border-t border-gray-100 flex items-end gap-3">
+              <div className="flex-1">
+                <label className="block text-sm font-medium mb-1">Generate from Template</label>
+                <select
+                  value={selectedTemplateId}
+                  onChange={(e) => setSelectedTemplateId(e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2"
+                >
+                  <option value="">-- Select Template --</option>
+                  {templates.map((t) => (
+                    <option key={t._id} value={t._id}>
+                      {t.roleName} ({t.basePhases?.length} phases)
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <Button disabled={!selectedTemplateId || loading} onClick={handleGenerateRoadmap}>
+                {loading ? 'Generating...' : '+ Assign Template'}
+              </Button>
+            </div>
           </Card>
         </div>
       )}

@@ -12,6 +12,7 @@ const TemplatesTab = () => {
     description: '',
     estimatedTotalDays: 30,
   });
+  const [isCreating, setIsCreating] = useState(false);
 
   const fetchTemplates = async () => {
     try {
@@ -30,13 +31,17 @@ const TemplatesTab = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isCreating) return;
     try {
+      setIsCreating(true);
       await adminService.createTemplate({ ...formData, basePhases: [] });
       setModalOpen(false);
       setFormData({ roleName: '', description: '', estimatedTotalDays: 30 });
       fetchTemplates();
     } catch (err) {
       alert('Failed to create template');
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -142,10 +147,17 @@ const TemplatesTab = () => {
                 />
               </div>
               <div className="flex gap-3 justify-end mt-6">
-                <Button variant="outline" type="button" onClick={() => setModalOpen(false)}>
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() => setModalOpen(false)}
+                  disabled={isCreating}
+                >
                   Cancel
                 </Button>
-                <Button type="submit">Create Engine</Button>
+                <Button type="submit" disabled={isCreating}>
+                  {isCreating ? 'Generating AI Template...' : 'Create Engine'}
+                </Button>
               </div>
             </form>
           </Card>

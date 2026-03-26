@@ -208,7 +208,36 @@ router.get('/templates', async (req, res) => {
  */
 router.post('/templates', async (req, res) => {
   try {
-    const template = new GlobalTemplate(req.body);
+    const { roleName, description, estimatedTotalDays } = req.body;
+    let basePhases = req.body.basePhases || [];
+
+    if (basePhases.length === 0) {
+      basePhases = await roadmapOptimizerService.generateBaseTemplate(
+        roleName,
+        description,
+        estimatedTotalDays
+      );
+    }
+
+    // Fallback if AI fails or returns empty array
+    if (basePhases.length === 0) {
+      basePhases = [
+        {
+          phaseNumber: 1,
+          phaseName: 'Core Fundamentals',
+          goal: 'Master the basics of ' + roleName,
+          startDay: 1,
+          endDay: 5,
+          days: [{ dayNumber: 1, topic: 'Introduction to ' + roleName, estimatedMinutes: 60 }],
+        },
+      ];
+    }
+
+    const template = new GlobalTemplate({
+      ...req.body,
+      basePhases,
+    });
+
     await template.save();
     res.status(201).json({ success: true, template });
   } catch (error) {

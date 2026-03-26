@@ -134,6 +134,70 @@ INSTRUCTIONS:
       return basePhases; // Hard fallback
     }
   }
+
+  /**
+   * Generates a comprehensive base template using AI based on a role description.
+   */
+  async generateBaseTemplate(roleName, description, estimatedTotalDays = 30) {
+    const { config } = require('../config/env.js');
+    if (!config.groq_api_key) return [];
+
+    try {
+      const Groq = require('groq-sdk');
+      const groq = new Groq({ apiKey: config.groq_api_key });
+
+      const prompt = `You are an expert technical curriculum architect.
+Your task is to build a master roadmap template for a ${roleName}.
+Description/Requirements: ${description}
+
+Design a structured, rigorous curriculum spanning approximately ${Math.min(estimatedTotalDays || 30, 90)} days of learning.
+Divide the curriculum into logical phases (e.g. Phase 1: Fundamentals).
+Within each phase, define specific daily topics.
+
+INSTRUCTIONS:
+1. Ensure a highly logical progression from beginner to advanced.
+2. Return ONLY a raw JSON array matching this exact schema:
+[
+  {
+    "phaseNumber": 1,
+    "phaseName": "Phase Title",
+    "goal": "Phase Goal",
+    "startDay": 1,
+    "endDay": 7,
+    "days": [
+      {
+        "dayNumber": 1,
+        "topic": "Daily Topic",
+        "estimatedMinutes": 60
+      }
+    ]
+  }
+]
+3. NO markdown, NO code blocks, ONLY the raw JSON array. Start your response with '[' and end with ']'.`;
+
+      const completion = await groq.chat.completions.create({
+        messages: [{ role: 'user', content: prompt }],
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.5,
+      });
+
+      let responseText = completion.choices[0]?.message?.content || '';
+
+      const startIdx = responseText.indexOf('[');
+      const endIdx = responseText.lastIndexOf(']');
+      if (startIdx !== -1 && endIdx !== -1) {
+        responseText = responseText.substring(startIdx, endIdx + 1);
+        const parsed = JSON.parse(responseText);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+      return [];
+    } catch (err) {
+      console.error('[Base Template Generation Error]', err.message);
+      return [];
+    }
+  }
 }
 
 module.exports = new RoadmapOptimizerService();

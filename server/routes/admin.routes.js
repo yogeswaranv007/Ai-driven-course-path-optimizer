@@ -235,14 +235,23 @@ router.post('/templates', async (req, res) => {
 
     // Fallback if AI fails or returns empty array
     if (basePhases.length === 0) {
+      const targetDays = estimatedTotalDays || 30;
+      const daysArray = [];
+      for (let i = 1; i <= targetDays; i++) {
+        daysArray.push({
+          dayNumber: i,
+          topic: `Progressive Milestone ${i} for ${roleName}`,
+          estimatedMinutes: 60,
+        });
+      }
       basePhases = [
         {
           phaseNumber: 1,
-          phaseName: 'Core Fundamentals',
-          goal: 'Master the basics of ' + roleName,
+          phaseName: 'Core Fundamentals & Deep Dive',
+          goal: 'Master the technical requirements for ' + roleName,
           startDay: 1,
-          endDay: 5,
-          days: [{ dayNumber: 1, topic: 'Introduction to ' + roleName, estimatedMinutes: 60 }],
+          endDay: targetDays,
+          days: daysArray,
         },
       ];
     }

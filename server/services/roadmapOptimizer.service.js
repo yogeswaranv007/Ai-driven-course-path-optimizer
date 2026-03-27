@@ -145,60 +145,57 @@ INSTRUCTIONS:
     try {
       const Groq = require('groq-sdk');
       const groq = new Groq({ apiKey: config.groq_api_key });
-      const { extractJsonObject } = require('./groq.service.js');
+      const targetDays = Math.min(estimatedTotalDays || 30, 90);
 
       const prompt = `You are an expert technical curriculum architect.
 Your task is to build a master roadmap template for a ${roleName}.
 Description/Requirements: ${description}
 
-Design a structured, rigorous curriculum spanning approximately ${Math.min(estimatedTotalDays || 30, 90)} days of learning.
+Design a structured, rigorous curriculum spanning exactly ${targetDays} days of learning.
 Divide the curriculum into logical phases (e.g. Phase 1: Fundamentals).
 Within each phase, define specific daily topics.
 
 INSTRUCTIONS:
 1. Ensure a highly logical progression from beginner to advanced.
-2. Return ONLY a raw JSON array matching this exact schema:
-[
-  {
-    "phaseNumber": 1,
-    "phaseName": "Phase Title",
-    "goal": "Phase Goal",
-    "startDay": 1,
-    "endDay": 7,
-    "days": [
-      {
-        "dayNumber": 1,
-        "topic": "Daily Topic",
-        "estimatedMinutes": 60
-      }
-    ]
-  }
-]
-3. NO markdown, NO code blocks, ONLY the raw JSON array. Start your response with '[' and end with ']'.`;
+2. Return a valid JSON object exactly matching this schema:
+{
+  "phases": [
+    {
+      "phaseNumber": 1,
+      "phaseName": "Phase Title",
+      "goal": "Phase Goal",
+      "startDay": 1,
+      "endDay": 7,
+      "days": [
+        {
+          "dayNumber": 1,
+          "topic": "Daily Topic",
+          "estimatedMinutes": 60
+        }
+      ]
+    }
+  ]
+}
+3. The response MUST be valid JSON.`;
 
       const completion = await groq.chat.completions.create({
         messages: [{ role: 'user', content: prompt }],
         model: 'llama-3.3-70b-versatile',
-        temperature: 0.5,
+        temperature: 0.3,
+        response_format: { type: 'json_object' },
       });
 
-      let responseText = completion.choices[0]?.message?.content || '';
+      let responseText = completion.choices[0]?.message?.content || '{}';
 
-      // Clean extraction via unified approach
-      const extractedStr = extractJsonObject(responseText);
-      if (extractedStr) {
-        const parsed = JSON.parse(extractedStr);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-
-      // Secondary array fast-fallback
-      const startIdx = responseText.indexOf('[');
-      const endIdx = responseText.lastIndexOf(']');
-      if (startIdx !== -1 && endIdx !== -1) {
-        responseText = responseText.substring(startIdx, endIdx + 1);
+      try {
         const parsed = JSON.parse(responseText);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (parsed.phases && Array.isArray(parsed.phases) && parsed.phases.length > 0) {
+          return parsed.phases;
+        }
+      } catch (parseErr) {
+        console.error('[JSON Parse Error in strict mode]', parseErr.message);
       }
+
       return [];
     } catch (err) {
       console.error('[Base Template Generation Error]', err.message);

@@ -60,6 +60,17 @@ const TemplatesTab = () => {
     }
   };
 
+  const handleDelete = async (templateId) => {
+    if (window.confirm('Are you absolutely sure you want to permanently delete this template?')) {
+      try {
+        await adminService.deleteTemplate(templateId);
+        fetchTemplates();
+      } catch (err) {
+        alert('Failed to delete template');
+      }
+    }
+  };
+
   return (
     <div className="animate-fade-in-up">
       <div className="flex justify-between items-center mb-8">
@@ -86,7 +97,17 @@ const TemplatesTab = () => {
               className="flex flex-col h-full hover:shadow-xl transition-shadow border-t-4 border-t-indigo-500"
             >
               <div className="flex-1">
-                <h3 className="text-xl font-bold text-gray-900">{template.roleName}</h3>
+                <div className="flex justify-between items-start">
+                  <h3 className="text-xl font-bold text-gray-900">{template.roleName}</h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDelete(template._id)}
+                    className="text-red-500 hover:bg-red-50 px-2 py-1 h-auto"
+                  >
+                    Delete
+                  </Button>
+                </div>
                 <p className="text-sm text-gray-500 mt-2 mb-4 line-clamp-3">
                   {template.description || 'No description provided.'}
                 </p>

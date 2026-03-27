@@ -78,7 +78,11 @@ const OverviewTab = ({ stats, users }) => {
           <h3 className="text-lg font-bold text-gray-800 mb-6">Activity by Users</h3>
           <div className="flex-1 w-full h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={(users || []).slice(0, 10)}>
+              <BarChart
+                data={[...(users || [])]
+                  .sort((a, b) => (b.roadmapCount || 0) - (a.roadmapCount || 0))
+                  .slice(0, 10)}
+              >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                 <YAxis allowDecimals={false} />
@@ -95,7 +99,7 @@ const OverviewTab = ({ stats, users }) => {
             </ResponsiveContainer>
           </div>
           <p className="text-xs text-gray-400 text-center mt-2">
-            Showing top 10 recent users' generated plans.
+            Showing top 10 most active users by generated plans.
           </p>
         </Card>
       </div>
